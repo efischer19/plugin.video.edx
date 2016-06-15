@@ -1,0 +1,3 @@
+Talk to Molly about licensing if/when this gets widely published.
+
+If you can read this, treat the code in this repo as an unpublished personal project and use at your own risk.
