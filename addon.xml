@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.video.edx" name="edX" version="0.0.0" provider-name="efischer19">
+    <requires>
+        <import addon="xbmc.python" version="2.24.0"/>
+    </requires>
+    <extension point="xbmc.python.pluginsource" library="main.py">
+        <provides>video</provides>
+    </extension>
+    <extension point="xbmc.addon.metadata">
+        <summary lang="en">edX course videos</summary>
+        <description lang="en">Watch video content from your edX courses</description>
+        <disclaimer lang="en">This is a hackathon project that may or may not be distributed</disclaimer>
+    </extension>
+</addon>
