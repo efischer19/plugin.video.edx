@@ -1,3 +1,4 @@
+import json
 import requests
 import sys
 import urllib
@@ -57,14 +58,12 @@ class EdxClient(object):
 
     def get_courses(self):
         url = BASE_URL + 'api/courses/v1/courses/?username=audit&page_size=2000'
-        xbmc.log('edx get_courses url: ' + url)
         data = self.get_response_data(url)
         return data['results']
 
     def get_course_blocks(self, base_course_url):
         # url is constructed to get all video blocks, as well as all structure blocks
         url = base_course_url + "&username=" + USERNAME + "&depth=all&block_types_filter=video,course,chapter,sequential,vertical&requested_fields=children&student_view_data=video"
-        xbmc.log('edx get_course_blocks url: ' + url)
         data = self.get_response_data(url)
         return data['blocks'], data['root']
 
@@ -179,7 +178,6 @@ class Course(object):
         root = next(node for node in node_set if node.id == root_id)
         root.pruning_walk(node_set)
         for node in [node for node in node_set if node.should_prune]:
-            xbmc.log("Node: {0} - name: {1}, url: {2},  children: {3}".format(node.id, node.name, node.url, str(node.children)))
             node_set.remove(node)
 
         # Export tree to dict
@@ -196,6 +194,7 @@ ARGS = urlparse.parse_qs(sys.argv[2][1:])
 xbmcplugin.setContent(PLUGIN_HANDLE, 'episodes')
 
 mode = ARGS.get('mode', None)
+current_key = ARGS.get('cur_key', None)
 
 if mode == None:  # First load, generate course structure
     # init progress dialog
@@ -209,19 +208,62 @@ if mode == None:  # First load, generate course structure
     # fetch list of courses
     progress.update(5, "Fetching course list...")
     courses = Course.build_from_results(client.get_courses())
-    xbmc.log('edX course listing: ' + str(courses))
 
-    # per course, build directory structure
     # simple progress calculation: get_access_token, get_courses, and each top-level addDirectoryItem are 1 'op'
     current_progress = 2  # get_access_token and get_courses
     max_progress = (2 + len(courses))
+
+    # per course, build directory structure
     for course in courses:
         progress.update(current_progress * 100 / max_progress, "Fetching course data for " + course.name)
         blocks, root_id = client.get_course_blocks(course.api_url)
         tree = course.build_tree(blocks, root_id)
-        xbmc.log("******* tree:" + str(tree))
-        # serialize that to settings, somehow
+
+        # serialize
+        def write_tree(key, values):
+            # id for children if they have children
+            # else, full value
+            values_to_write = []
+            for val in values:
+                if 'children' in val:
+                    values_to_write.append({'id': val['id'], 'name': val['name'], 'children': True})
+                    write_tree(val['id'], val['children'])
+                else:
+                    values_to_write.append(val)
+                    with open(xbmc.translatePath('special://temp')+key+'.strm', 'w+') as file:
+                        file.write(val['url'])
+            with open(xbmc.translatePath('special://temp')+key, 'w+') as file:
+                file.write(json.dumps(values_to_write))
+
+        write_tree(root_id, tree['children'])
+
         # add top-level entry to current dir listing
+        url = build_url({'mode':'folder', 'cur_key': tree['id']})
+        li = xbmcgui.ListItem(tree['name'])
+        xbmcplugin.addDirectoryItem(handle=PLUGIN_HANDLE, url=url, listitem=li, isFolder=True)
+
+        # update progress
         current_progress = current_progress + 1
 
     progress.close()
+    xbmcplugin.endOfDirectory(PLUGIN_HANDLE)
+
+elif mode[0] == 'folder':
+    # We're in a folder
+    with open(xbmc.translatePath('special://temp')+current_key[0], 'r') as file:
+        values = json.loads(file.read())
+    for val in values:
+        if 'children' in val:
+            url = build_url({'mode':'folder', 'cur_key': val['id']})
+            li = xbmcgui.ListItem(val['name'])
+            xbmcplugin.addDirectoryItem(handle=PLUGIN_HANDLE, url=url, listitem=li, isFolder=True)
+        else:
+            li = xbmcgui.ListItem(val['name'])
+            li.setProperty('IsPlayable', 'true')
+            url = build_url({'mode': 'play', 'video': val['id']+'.strm'})
+            xbmcplugin.addDirectoryItem(handle=PLUGIN_HANDLE, url=val['url'], listitem=li, isFolder=False)
+    xbmcplugin.endOfDirectory(PLUGIN_HANDLE)
+
+elif mode[0] == 'play':
+    play_item = xbmcgui.ListItem(path=ARGS['video'])
+    xbmcplugin.setResolvedUrl(PLUGIN_HANDLE, True, listitem=play_item)
