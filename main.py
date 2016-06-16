@@ -1,9 +1,10 @@
 import requests
+import sys
+import urllib
+import urlparse
 import xbmc
-import xbmcaddon
 import xbmcgui
-
-from collections import defaultdict
+import xbmcplugin
 
 # Security hole: do not release until this is removed, which will not be possible until the python version
 # bundled with Kodi gets upgraded in the upcoming Krypton release. https://github.com/xbmc/xbmc/pull/8207
@@ -56,9 +57,16 @@ class EdxClient(object):
 
     def get_courses(self):
         url = BASE_URL + 'api/courses/v1/courses/?username=audit&page_size=2000'
-        xbmc.log('edx get_mobile_courses url: ' + url)
+        xbmc.log('edx get_courses url: ' + url)
         data = self.get_response_data(url)
         return data['results']
+
+    def get_course_blocks(self, base_course_url):
+        # url is constructed to get all video blocks, as well as all structure blocks
+        url = base_course_url + "&username=" + USERNAME + "&depth=all&block_types_filter=video,course,chapter,sequential,vertical&requested_fields=children&student_view_data=video"
+        xbmc.log('edx get_course_blocks url: ' + url)
+        data = self.get_response_data(url)
+        return data['blocks'], data['root']
 
 
 class Course(object):
@@ -96,15 +104,124 @@ class Course(object):
             for r in results
         ]
 
+    def build_tree(self, blocks, root_id):
+        """
+        Builds and returns a dict, representing the tree for this course
+        """
+        class Node(object):
+            def __init__(self, key):
+                self.children = set()
+                self.name = ''
+                self.url = ''
+                self.id = key
+                self.should_prune = True
 
-ADDON_NAME = xbmcaddon.Addon().getAddonInfo('name')
+            def __hash__(self):
+                return hash(self.id)
 
-if __name__ == "__main__":
+            def is_leaf(self):
+                return len(self.children) == 0
+
+            def pruning_walk(self, node_set):
+                if self.is_leaf() and self.url:
+                    self.should_prune = False
+                    return False
+                for child in [
+                        node
+                        for node in node_set
+                        if node.id in [
+                            child.id
+                            for child in self.children
+                        ]
+                    ]:
+                    if not child.pruning_walk(node_set):
+                        self.should_prune = False
+                return self.should_prune
+
+            def to_dict(self, node_set):
+                if self.is_leaf():
+                    return {
+                        'id': self.id,
+                        'name': self.name,
+                        'url': self.url
+                    }
+                return {
+                    'id': self.id,
+                    'name': self.name,
+                    'children': [
+                        node.to_dict(node_set)
+                        for node in node_set
+                        if node.id in [
+                            child.id
+                            for child in self.children
+                        ]
+                    ]
+                }
+
+        # setup Node tracking
+        node_set = set()
+
+        # Build Node objects
+        for key, value in blocks.iteritems():
+            node = Node(key)
+            node.name = value['display_name']
+            try:
+                if value['type'] != 'video':
+                    node.children = [Node(child) for child in value['children']]
+                else:
+                    urls = [val['url'] for key, val in value['student_view_data']['encoded_videos'].iteritems()]
+                    node.url = urls[0]  # should only be one per here
+            except KeyError:
+                pass  # if something went wrong, we won't be able to play this video node, or the non-video node has no children
+            node_set.add(node)
+
+        # Prune invalid paths (branches with no video)
+        root = next(node for node in node_set if node.id == root_id)
+        root.pruning_walk(node_set)
+        for node in [node for node in node_set if node.should_prune]:
+            xbmc.log("Node: {0} - name: {1}, url: {2},  children: {3}".format(node.id, node.name, node.url, str(node.children)))
+            node_set.remove(node)
+
+        # Export tree to dict
+        return root.to_dict(node_set)
+
+def build_url(query):
+    return PLUGIN_URL + '?' + urllib.urlencode(query)
+
+#### Main script execution begins here on each load ####
+PLUGIN_URL = sys.argv[0]
+PLUGIN_HANDLE = int(sys.argv[1])
+ARGS = urlparse.parse_qs(sys.argv[2][1:])
+
+xbmcplugin.setContent(PLUGIN_HANDLE, 'episodes')
+
+mode = ARGS.get('mode', None)
+
+if mode == None:  # First load, generate course structure
+    # init progress dialog
+    progress = xbmcgui.DialogProgress()
+
+    # setup client with access token
+    progress.create('edX', "Asking server for access token...")
     client = EdxClient()
     client.get_access_token()
+
+    # fetch list of courses
+    progress.update(5, "Fetching course list...")
     courses = Course.build_from_results(client.get_courses())
     xbmc.log('edX course listing: ' + str(courses))
-    xbmcgui.Dialog().ok(ADDON_NAME, 'SUCCESS')
 
+    # per course, build directory structure
+    # simple progress calculation: get_access_token, get_courses, and each top-level addDirectoryItem are 1 'op'
+    current_progress = 2  # get_access_token and get_courses
+    max_progress = (2 + len(courses))
+    for course in courses:
+        progress.update(current_progress * 100 / max_progress, "Fetching course data for " + course.name)
+        blocks, root_id = client.get_course_blocks(course.api_url)
+        tree = course.build_tree(blocks, root_id)
+        xbmc.log("******* tree:" + str(tree))
+        # serialize that to settings, somehow
+        # add top-level entry to current dir listing
+        current_progress = current_progress + 1
 
-#https://efischer19.sandbox.edx.org/api/courses/v1/blocks/?course_id=course-v1%3AedX%2BDemoX%2BDemo_Course&username=staff&depth=all&block_types_filter=video&student_view_data=video
+    progress.close()
