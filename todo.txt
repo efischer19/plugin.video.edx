@@ -1,7 +1,8 @@
-Thing to do for this hackathon project:
-    -authenticate to edX
-    -get course listing for user
-    -get course structure per course, scrape videos
+Things to do for this hackathon project:
+    Xauthenticate to edX
+    Xget course listing for user
+    -convert courses into directory structure, with videos at leaf nodes
+        -add option for context menu "course details" view as well
     -be able to play videos
     -write some unit tests
     -look into i18n support
