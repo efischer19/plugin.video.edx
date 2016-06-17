@@ -3,9 +3,9 @@ Main handler for plugin.video.edx
 """
 import json
 import urllib
-import xbmc
-import xbmcgui
-import xbmcplugin
+import xbmc  # pylint: disable=import-error
+import xbmcgui  # pylint: disable=import-error
+import xbmcplugin  # pylint: disable=import-error
 
 from resources.course import Course
 
@@ -23,10 +23,13 @@ def settings_error():
     """
     dialog = xbmcgui.Dialog()
     # i18n these strings!
-    dialog.ok('edX Error', 'Error in edX configuration. Please ensure that username and password are valid. If you don\'t have an account, visit https://courses.edx.org/register to sign up and start learning!')
+    dialog.ok('edX Error', 'Error in edX configuration. Please ensure that username and password are valid. If you don\'t have an account, visit https://courses.edx.org/register to sign up and start learning!')  # pylint: disable=line-too-long
 
 
 def file_location(key, extension=''):
+    """
+    Helper to construct a common location for files to be saved.
+    """
     plugin_prefix = "plugin.video.edx"
     return "{0}{1}:{2}{3}".format(
         xbmc.translatePath('special://temp'),
@@ -103,7 +106,7 @@ def refresh_course_structure(client):
     return ids
 
 
-def handle(mode, key, client, handle, base_url):
+def handle(mode, key, client, plugin_handle, base_url):
     """
     Main handling logic for plugin
     """
@@ -113,15 +116,15 @@ def handle(mode, key, client, handle, base_url):
         # add top-level entries to current dir listing
         for c_id, c_name in courses:
             url = build_url(base_url, {'mode':'folder', 'cur_key': c_id})
-            li = xbmcgui.ListItem(c_name)
+            list_item = xbmcgui.ListItem(c_name)
             xbmcplugin.addDirectoryItem(
-                handle=handle,
+                handle=plugin_handle,
                 url=url,
-                listitem=li,
+                listitem=list_item,
                 isFolder=True
             )
 
-        xbmcplugin.endOfDirectory(handle)
+        xbmcplugin.endOfDirectory(plugin_handle)
 
     elif mode[0] == 'folder':
         # We're in a folder
@@ -131,25 +134,25 @@ def handle(mode, key, client, handle, base_url):
         for val in values:
             if 'children' in val:
                 url = build_url(base_url, {'mode':'folder', 'cur_key': val['id']})
-                li = xbmcgui.ListItem(val['name'])
+                list_item = xbmcgui.ListItem(val['name'])
                 xbmcplugin.addDirectoryItem(
-                    handle=handle,
+                    handle=plugin_handle,
                     url=url,
-                    listitem=li,
+                    listitem=list_item,
                     isFolder=True
                 )
             else:
-                li = xbmcgui.ListItem(val['name'])
-                li.setProperty('IsPlayable', 'true')
+                list_item = xbmcgui.ListItem(val['name'])
+                list_item.setProperty('IsPlayable', 'true')
                 url = build_url(base_url, {'mode': 'play', 'cur_key': val['id']+'.strm'})
                 xbmcplugin.addDirectoryItem(
-                    handle=handle,
+                    handle=plugin_handle,
                     url=val['url'],
-                    listitem=li,
+                    listitem=list_item,
                     isFolder=False
                 )
-        xbmcplugin.endOfDirectory(handle)
+        xbmcplugin.endOfDirectory(plugin_handle)
 
     elif mode[0] == 'play':
         play_item = xbmcgui.ListItem(path=key[0])
-        xbmcplugin.setResolvedUrl(handle, True, listitem=play_item)
+        xbmcplugin.setResolvedUrl(plugin_handle, True, listitem=play_item)

@@ -11,10 +11,12 @@ def youtube_url(initial_url):
     See http://kodi.wiki/view/Add-on:YouTube for details.
     """
     video_id = initial_url.split('=')[1]
-    return 'plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid={0}'.format(video_id)
+    return 'plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid={0}'.format(
+        video_id
+    )
 
 
-class NodeDefaultDict(dict):
+class NodeDefaultDict(dict):  # pylint: disable=too-few-public-methods
     """
     A defaultdict that takes a key argument, and creates a new Node if missing
     """
@@ -53,7 +55,7 @@ class Course(object):
             for r in results
         ]
 
-    def build_tree(self, blocks, root_id):
+    def build_tree(self, blocks, root_id):  # pylint: disable=no-self-use
         """
         Builds and returns a dict representing the tree for this course
         """
@@ -104,7 +106,7 @@ class Node(object):
         self._id = key
         self.should_prune = True
 
-    def is_leaf(self):
+    def is_leaf(self):  # pylint: disable=missing-docstring
         return len(self.children) == 0
 
     def pruning_walk(self):

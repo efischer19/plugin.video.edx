@@ -37,7 +37,7 @@ class EdxClient(object):
         )
         self.__access_token = response.json()['access_token']
 
-    def has_access_token(self):
+    def has_access_token(self):  # pylint: disable=missing-docstring
         return self.__access_token != ''
 
     def get_response_data(self, url):
