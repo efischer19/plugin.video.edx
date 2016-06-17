@@ -26,6 +26,16 @@ def settings_error():
     dialog.ok('edX Error', 'Error in edX configuration. Please ensure that username and password are valid. If you don\'t have an account, visit https://courses.edx.org/register to sign up and start learning!')
 
 
+def file_location(key, extension=''):
+    plugin_prefix = "plugin.video.edx"
+    return "{0}{1}:{2}{3}".format(
+        xbmc.translatePath('special://temp'),
+        plugin_prefix,
+        key,
+        extension
+    )
+
+
 def write_tree(key, values):
     """
     Writes a course tree to temp storage, 1 layer at a time
@@ -44,11 +54,11 @@ def write_tree(key, values):
             write_tree(val['id'], val['children'])
         else:
             values_to_write.append(val)
-            stream_file = xbmc.translatePath('special://temp')+key+'.strm'
-            with open(stream_file, 'w+') as file:
-                file.write(val['url'])
-    with open(xbmc.translatePath('special://temp')+key, 'w+') as file:
-        file.write(json.dumps(values_to_write))
+            stream_file = file_location(key, '.strm')
+            with open(stream_file, 'w+') as write_file:
+                write_file.write(val['url'])
+    with open(file_location(key), 'w+') as write_file:
+        write_file.write(json.dumps(values_to_write))
 
 
 def refresh_course_structure(client):
@@ -115,9 +125,9 @@ def handle(mode, key, client, handle, base_url):
 
     elif mode[0] == 'folder':
         # We're in a folder
-        folder_path = xbmc.translatePath('special://temp')+key[0]
-        with open(folder_path, 'r') as file:
-            values = json.loads(file.read())
+        folder_path = file_location(key[0])
+        with open(folder_path, 'r') as read_file:
+            values = json.loads(read_file.read())
         for val in values:
             if 'children' in val:
                 url = build_url(base_url, {'mode':'folder', 'cur_key': val['id']})
