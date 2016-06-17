@@ -141,16 +141,16 @@ class Course(object):
                     if self.alternate_urls:
                         ret_dict['alternate_urls'] = self.alternate_urls
                     return ret_dict
+                child_nodes = [
+                    next((node for node in node_set if node.id == child.id), None)
+                    for child in self.children
+                ]
                 return {
                     'id': self.id,
                     'name': self.name,
                     'children': [
                         node.to_dict(node_set)
-                        for node in node_set
-                        if node.id in [
-                            child.id
-                            for child in self.children
-                        ]
+                        for node in child_nodes if node != None
                     ]
                 }
 
