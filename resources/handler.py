@@ -1,10 +1,13 @@
+"""
+Main handler for plugin.video.edx
+"""
 import json
 import urllib
 import xbmc
 import xbmcgui
 import xbmcplugin
 
-from course import Course
+from resources.course import Course
 
 
 def build_url(plugin_url, query):
@@ -128,7 +131,7 @@ def handle(mode, key, client, handle, base_url):
             else:
                 li = xbmcgui.ListItem(val['name'])
                 li.setProperty('IsPlayable', 'true')
-                url = build_url(base_url, {'mode': 'play', 'video': val['id']+'.strm'})
+                url = build_url(base_url, {'mode': 'play', 'cur_key': val['id']+'.strm'})
                 xbmcplugin.addDirectoryItem(
                     handle=handle,
                     url=val['url'],
@@ -138,5 +141,5 @@ def handle(mode, key, client, handle, base_url):
         xbmcplugin.endOfDirectory(handle)
 
     elif mode[0] == 'play':
-        play_item = xbmcgui.ListItem(path=ARGS['video'])
+        play_item = xbmcgui.ListItem(path=key[0])
         xbmcplugin.setResolvedUrl(handle, True, listitem=play_item)

@@ -4,8 +4,8 @@ This module contains all the logic needed to talk to edX APIs
 import requests
 
 
-# Security hole: do not release until this is removed, which will not be possible until the python version
-# bundled with Kodi gets upgraded in the upcoming Krypton release. https://github.com/xbmc/xbmc/pull/8207
+# Because of the python version used by Kodi, this is needed to avoid SSL
+# warnings. Can be removed on upgrade to Karma.
 requests.packages.urllib3.disable_warnings()
 
 
@@ -51,6 +51,9 @@ class EdxClient(object):
         return response.json()
 
     def get_courses(self):
+        """
+        Gets all the courses the user is currently enrolled in.
+        """
         url = "{0}{1}{2}{3}{4}".format(
             self.base_url,
             "api/courses/v1/courses/",
@@ -62,7 +65,9 @@ class EdxClient(object):
         return data['results']
 
     def get_course_blocks(self, base_course_url):
-        # url is constructed to get all video blocks, as well as all structure blocks
+        """
+        url is constructed to get all video blocks, as well as all structure blocks
+        """
         url = "{0}{1}{2}{3}{4}{5}{6}".format(
             base_course_url,
             "&username=",

@@ -3,7 +3,6 @@ This module contains all the logic used to translate the results of a
 course_blocks api call into a plugin-useable dictionary of videos and
 folders that contain videos.
 """
-from collections import defaultdict
 
 def youtube_url(initial_url):
     """
@@ -29,7 +28,7 @@ class Course(object):
     Contains all the relevant info for the user's courses
     """
 
-    def __init__(self, name, number, org, media, api_url):
+    def __init__(self, name, number, org, api_url):
         """
         name: string - used as directory title
         number: string
@@ -50,7 +49,7 @@ class Course(object):
         Builds and returns a list of Course objects, given a course listing result.
         """
         return [
-            Course(r['name'], r['number'], r['org'], r['media'], r['blocks_url'])
+            Course(r['name'], r['number'], r['org'], r['blocks_url'])
             for r in results
         ]
 
@@ -102,7 +101,7 @@ class Node(object):
         self.name = ''
         self.url = ''
         self.alternate_urls = []
-        self.id = key
+        self._id = key
         self.should_prune = True
 
     def is_leaf(self):
@@ -131,7 +130,7 @@ class Node(object):
         """
         if self.is_leaf():
             ret_dict = {
-                'id': self.id,
+                'id': self._id,
                 'name': self.name,
                 'url': self.url
             }
@@ -142,7 +141,7 @@ class Node(object):
 
         # This is not a leaf node, and will have child dictionaries
         return {
-            'id': self.id,
+            'id': self._id,
             'name': self.name,
             'children': [
                 node.to_dict()
