@@ -112,6 +112,7 @@ class Course(object):
                 self.children = set()
                 self.name = ''
                 self.url = ''
+                self.alternate_urls = []
                 self.id = key
                 self.should_prune = True
 
@@ -139,11 +140,14 @@ class Course(object):
 
             def to_dict(self, node_set):
                 if self.is_leaf():
-                    return {
+                    ret_dict = {
                         'id': self.id,
                         'name': self.name,
                         'url': self.url
                     }
+                    if self.alternate_urls:
+                        ret_dict['alternate_urls'] = self.alternate_urls
+                    return ret_dict
                 return {
                     'id': self.id,
                     'name': self.name,
@@ -168,8 +172,18 @@ class Course(object):
                 if value['type'] != 'video':
                     node.children = [Node(child) for child in value['children']]
                 else:
-                    urls = [val['url'] for key, val in value['student_view_data']['encoded_videos'].iteritems()]
-                    node.url = urls[0]  # should only be one per here
+                    urls = []
+                    for key, val in value['student_view_data']['encoded_videos'].iteritems():
+                        if key == 'youtube':
+                            # youtube url has format "https://www.youtube.com/watch?v=$VIDEOID"
+                            # we want "plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid=$VIDEOID"
+                            # per http://kodi.wiki/view/Add-on:YouTube
+                            video_id = val['url'].split('=')[1]
+                            urls.append('plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid=' + video_id)
+                        else:
+                            urls.append(val['url'])
+                    node.url = urls.pop(0)
+                    node.alternate_urls = urls
             except KeyError:
                 pass  # if something went wrong, we won't be able to play this video node, or the non-video node has no children
             node_set.add(node)
