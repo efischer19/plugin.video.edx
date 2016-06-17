@@ -12,20 +12,13 @@ import xbmcplugin
 requests.packages.urllib3.disable_warnings()
 # Addt'l note for python version bump: we can remove the string concats for format() at that time too
 
-# I'm using global constants for all these rn, instead of figuring out addon settings properly
-# that'll come later
-BASE_URL = 'https://efischer19.sandbox.edx.org/'
-USERNAME = 'audit'
-USER_PASSWORD = 'edx'
-OAUTH2_CLIENT_ID = 'plugin.video.edx.hackathon_dev_id'
-
 class EdxClient(object):
     """
     A class containing all the "talk to edx servers" functionality needed by this plugin.
     """
-    access_token_url = BASE_URL + 'oauth2/access_token/'
 
     def __init__(self):
+        self.access_token_url = BASE_URL + 'oauth2/access_token/'
         __access_token = ''
 
     def get_access_token(self):
@@ -33,7 +26,7 @@ class EdxClient(object):
         Uses class constants (eventually settings values) to get an access token
         """
         response = requests.post(
-            EdxClient.access_token_url,
+            self.access_token_url,
             data={
                 'client_id': OAUTH2_CLIENT_ID,
                 'grant_type': 'password',
@@ -209,75 +202,84 @@ xbmcplugin.setContent(PLUGIN_HANDLE, 'episodes')
 
 mode = ARGS.get('mode', None)
 current_key = ARGS.get('cur_key', None)
+BASE_URL = xbmcplugin.getSetting(PLUGIN_HANDLE, 'base_url')
+USERNAME = xbmcplugin.getSetting(PLUGIN_HANDLE, 'username')
+USER_PASSWORD = xbmcplugin.getSetting(PLUGIN_HANDLE, 'password')
+OAUTH2_CLIENT_ID = 'plugin.video.edx.hackathon_dev_id'
 
-if mode == None:  # First load, generate course structure
-    # init progress dialog
-    progress = xbmcgui.DialogProgress()
+if not BASE_URL or not USERNAME or not USER_PASSWORD:
+    dialog = xbmcgui.Dialog()
+    # i18n these strings!
+    dialog.ok('edX Error', 'Error in edX configuration. Please ensure that username and password are valid. If you don\'t have an account, visit https://courses.edx.org/register to sign up and start learning!')
+else:
+    if mode == None:  # First load, generate course structure
+        # init progress dialog
+        progress = xbmcgui.DialogProgress()
 
-    # setup client with access token
-    progress.create('edX', "Asking server for access token...")
-    client = EdxClient()
-    client.get_access_token()
+        # setup client with access token
+        progress.create('edX', "Asking server for access token...")
+        client = EdxClient()
+        client.get_access_token()
 
-    # fetch list of courses
-    progress.update(5, "Fetching course list...")
-    courses = Course.build_from_results(client.get_courses())
+        # fetch list of courses
+        progress.update(5, "Fetching course list...")
+        courses = Course.build_from_results(client.get_courses())
 
-    # simple progress calculation: get_access_token, get_courses, and each top-level addDirectoryItem are 1 'op'
-    current_progress = 2  # get_access_token and get_courses
-    max_progress = (2 + len(courses))
+        # simple progress calculation: get_access_token, get_courses, and each top-level addDirectoryItem are 1 'op'
+        current_progress = 2  # get_access_token and get_courses
+        max_progress = (2 + len(courses))
 
-    # per course, build directory structure
-    for course in courses:
-        progress.update(current_progress * 100 / max_progress, "Fetching course data for " + course.name)
-        blocks, root_id = client.get_course_blocks(course.api_url)
-        tree = course.build_tree(blocks, root_id)
+        # per course, build directory structure
+        for course in courses:
+            progress.update(current_progress * 100 / max_progress, "Fetching course data for " + course.name)
+            blocks, root_id = client.get_course_blocks(course.api_url)
+            tree = course.build_tree(blocks, root_id)
 
-        # serialize
-        def write_tree(key, values):
-            # id for children if they have children
-            # else, full value
-            values_to_write = []
-            for val in values:
-                if 'children' in val:
-                    values_to_write.append({'id': val['id'], 'name': val['name'], 'children': True})
-                    write_tree(val['id'], val['children'])
-                else:
-                    values_to_write.append(val)
-                    with open(xbmc.translatePath('special://temp')+key+'.strm', 'w+') as file:
-                        file.write(val['url'])
-            with open(xbmc.translatePath('special://temp')+key, 'w+') as file:
-                file.write(json.dumps(values_to_write))
+            # serialize
+            def write_tree(key, values):
+                # id for children if they have children
+                # else, full value
+                values_to_write = []
+                for val in values:
+                    if 'children' in val:
+                        values_to_write.append({'id': val['id'], 'name': val['name'], 'children': True})
+                        write_tree(val['id'], val['children'])
+                    else:
+                        values_to_write.append(val)
+                        with open(xbmc.translatePath('special://temp')+key+'.strm', 'w+') as file:
+                            file.write(val['url'])
+                with open(xbmc.translatePath('special://temp')+key, 'w+') as file:
+                    file.write(json.dumps(values_to_write))
 
-        write_tree(root_id, tree['children'])
+            write_tree(root_id, tree['children'])
 
-        # add top-level entry to current dir listing
-        url = build_url({'mode':'folder', 'cur_key': tree['id']})
-        li = xbmcgui.ListItem(tree['name'])
-        xbmcplugin.addDirectoryItem(handle=PLUGIN_HANDLE, url=url, listitem=li, isFolder=True)
-
-        # update progress
-        current_progress = current_progress + 1
-
-    progress.close()
-    xbmcplugin.endOfDirectory(PLUGIN_HANDLE)
-
-elif mode[0] == 'folder':
-    # We're in a folder
-    with open(xbmc.translatePath('special://temp')+current_key[0], 'r') as file:
-        values = json.loads(file.read())
-    for val in values:
-        if 'children' in val:
-            url = build_url({'mode':'folder', 'cur_key': val['id']})
-            li = xbmcgui.ListItem(val['name'])
+            # add top-level entry to current dir listing
+            url = build_url({'mode':'folder', 'cur_key': tree['id']})
+            li = xbmcgui.ListItem(tree['name'])
             xbmcplugin.addDirectoryItem(handle=PLUGIN_HANDLE, url=url, listitem=li, isFolder=True)
-        else:
-            li = xbmcgui.ListItem(val['name'])
-            li.setProperty('IsPlayable', 'true')
-            url = build_url({'mode': 'play', 'video': val['id']+'.strm'})
-            xbmcplugin.addDirectoryItem(handle=PLUGIN_HANDLE, url=val['url'], listitem=li, isFolder=False)
-    xbmcplugin.endOfDirectory(PLUGIN_HANDLE)
 
-elif mode[0] == 'play':
-    play_item = xbmcgui.ListItem(path=ARGS['video'])
-    xbmcplugin.setResolvedUrl(PLUGIN_HANDLE, True, listitem=play_item)
+            # update progress
+            current_progress = current_progress + 1
+
+        progress.close()
+        xbmcplugin.endOfDirectory(PLUGIN_HANDLE)
+
+    elif mode[0] == 'folder':
+        # We're in a folder
+        with open(xbmc.translatePath('special://temp')+current_key[0], 'r') as file:
+            values = json.loads(file.read())
+        for val in values:
+            if 'children' in val:
+                url = build_url({'mode':'folder', 'cur_key': val['id']})
+                li = xbmcgui.ListItem(val['name'])
+                xbmcplugin.addDirectoryItem(handle=PLUGIN_HANDLE, url=url, listitem=li, isFolder=True)
+            else:
+                li = xbmcgui.ListItem(val['name'])
+                li.setProperty('IsPlayable', 'true')
+                url = build_url({'mode': 'play', 'video': val['id']+'.strm'})
+                xbmcplugin.addDirectoryItem(handle=PLUGIN_HANDLE, url=val['url'], listitem=li, isFolder=False)
+        xbmcplugin.endOfDirectory(PLUGIN_HANDLE)
+
+    elif mode[0] == 'play':
+        play_item = xbmcgui.ListItem(path=ARGS['video'])
+        xbmcplugin.setResolvedUrl(PLUGIN_HANDLE, True, listitem=play_item)

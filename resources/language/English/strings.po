@@ -1,0 +1,41 @@
+# Kodi Media Center language file
+# Addon Name: edX
+# Addon id: plugin.video.edx
+# Addon version: 0.0.0
+# Addon Provider: efischer19
+# Note: this was not actually generated on Transifex, I've been hand-crafting this file while developing the plugin
+
+msgid ""
+msgstr ""
+"Project-Id-Version: XBMC-Addons\n"
+"Report-Msgid-Bugs-To: efischer@edx.org\n"
+"POT-Creation-Date: 2016-06-17 09:00+0000\n"
+"Language-Team: LANGUAGE\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: en\n"
+
+msgctxt "Addon Summary"
+msgid "Plugin for edX"
+msgstr ""
+
+msgctxt "Addon Description"
+msgid "Supplement your learning on edX by watching videos in Kodi"
+msgstr ""
+
+msgctxt "#30001"
+msgid "edX Configuration"
+msgstr ""
+
+msgctxt "#30002"
+msgid "Username"
+msgstr "" 
+
+msgctxt "#30003"
+msgid "Password"
+msgstr ""
+
+msgctxt "#30004"
+msgid "Base edX instance"
+msgstr ""
