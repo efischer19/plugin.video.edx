@@ -1,0 +1,5 @@
+v0.1.0 (2016-17-06)
+- Basic functionality working
+- Nice clean codebase for future work
+- Steps to full release laid out
+- Only works on sandbox environment due to auth keys
